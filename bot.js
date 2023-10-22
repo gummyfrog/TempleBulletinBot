@@ -9,9 +9,12 @@ class DiscordBot {
 	constructor() {
 		this.code = json.readFileSync('config.json').token;
 
-		const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+		const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 		client.commands = new Collection();
 
+		client.cooldowns = new Collection();
+		client.COOLDOWN_SECONDS = 15;
+		
 		const commandsPath = path.join(__dirname, 'commands');
 		const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 		
@@ -41,7 +44,7 @@ class DiscordBot {
 			}
 		
 			try {
-				await command.execute(interaction);
+				await command.execute(client, interaction);
 			} catch (error) {
 				console.error(error);
 				if (interaction.replied || interaction.deferred) {

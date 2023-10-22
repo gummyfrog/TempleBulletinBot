@@ -2,7 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 
 const terms = [
-	{ code: '202436', description: 'Fall 2024' },
+	// { code: '202436', description: 'Fall 2024' },
 	// { code: '202426', description: '2024 Summer II' },
 	// { code: '202420', description: '2024 Summer I' },
 	{ code: '202403', description: 'Spring 2024' },
@@ -25,10 +25,10 @@ var teaches = async (course) => {
 		cookiesStr = cookiesStr.substring(0, cookiesStr.length - 2);
 
 		var headers = {
-			"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/118.0",
-			"Accept": "*/*",
-			"Accept-Language": "en-US,en;q=0.5",
-			"X-Synchronizer-Token": "dd8cd448-9e92-4933-90b4-00004e6f532d",
+			// "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/118.0",
+			// "Accept": "*/*",
+			// "Accept-Language": "en-US,en;q=0.5",
+			// "X-Synchronizer-Token": "dd8cd448-9e92-4933-90b4-00004e6f532d",
 			"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
 			"X-Requested-With": "XMLHttpRequest",
 			"Sec-Fetch-Dest": "empty",
@@ -66,7 +66,15 @@ var teaches = async (course) => {
 				serverPromise.json()
 				.then(function(j) { 
 					j.ztcEncodedImage = "";
-					resolve(j.data);
+					console.log(j.data);
+
+					fetch("https://prd-xereg.temple.edu/StudentRegistrationSsb/ssb/classSearch/resetDataForm", {
+						"credentials": "include",
+						"headers": headers,
+						"method": "POST",
+					}).then(() => {
+						resolve(j.data);
+					});
 				})
 				.catch(function(e){
 					console.log(e);
@@ -127,61 +135,71 @@ module.exports = {
 
 	
 
-	async execute(interaction) {
-		try {
-			
-			const course = {
-				term: interaction.options.getString('term'),
-				subjectCode: interaction.options.getString('subject').toUpperCase(),
-				courseNumber: interaction.options.getString('number')	
-			}
-
-			if(terms.filter(term => term.code == course.term).length == 0) { 
-				await interaction.reply('Invalid Term.');
-			} 
-			var termFullName = terms.filter(term => term.code == course.term)[0].description;
-
-			const embed = new EmbedBuilder()
-				.setColor("#9E1B34")
-				.setAuthor({ name: `Sections for ${termFullName} ${course.subjectCode} ${course.courseNumber}`, iconURL: 'https://teamcolorcodes.com/wp-content/uploads/2018/05/Temple-Owls-Logo-PNG.png', url: 'https://prd-xereg.temple.edu/StudentRegistrationSsb/ssb/classSearch/classSearch' })
-
-			var courses = await teaches(course);
-			
-			console.log(courses);
-			for(var section of courses) {
-				var string = `
-					**Campus**: ${section.campusDescription}
-					**${section.scheduleTypeDescription}**
-				`
-
-				for(var faculty of section.faculty) {
-					string += `**Instructor:** ${faculty.displayName}
-					📧 ${faculty.emailAddress}`
-
-				}
-
-				string += `\n**– Meeting Times –**`
+	async execute(client, interaction) {
+		if (client.cooldowns.has("Lookup")) {
+			interaction.reply({ content: "This command is on cooldown. Please wait a few seconds.", ephemeral: true });
+		} else {
+			try {
 				
-				for(var meeting of section.meetingsFaculty) {
-					string += `
-
-						**MEETING TIME ${meeting.category}**
-						${meeting.meetingTime.buildingDescription}
-						⏳ ${meeting.meetingTime.beginTime}
-					 	⌛ ${meeting.meetingTime.endTime}
-						🗓️ ${meetingDays(meeting.meetingTime)}
-					`
+				const course = {
+					term: interaction.options.getString('term'),
+					subjectCode: interaction.options.getString('subject').toUpperCase(),
+					courseNumber: interaction.options.getString('number')	
 				}
-				console.log(section.faculty);
 
-				embed.addFields({name: `Section ${section.sequenceNumber} (${section.courseReferenceNumber})`, value: string, inline: true});
+				if(terms.filter(term => term.code == course.term).length == 0) { 
+					await interaction.reply('Invalid Term.');
+				} 
+				var termFullName = terms.filter(term => term.code == course.term)[0].description;
+
+				const embed = new EmbedBuilder()
+					.setColor("#9E1B34")
+					.setAuthor({ name: `Sections for ${termFullName} ${course.subjectCode} ${course.courseNumber}`, iconURL: 'https://teamcolorcodes.com/wp-content/uploads/2018/05/Temple-Owls-Logo-PNG.png', url: 'https://prd-xereg.temple.edu/StudentRegistrationSsb/ssb/classSearch/classSearch' })
+
+				var courses = await teaches(course);
+				
+				console.log(courses);
+				for(var section of courses) {
+					var string = `
+						**Campus**: ${section.campusDescription}
+						**${section.scheduleTypeDescription}**
+					`
+
+					for(var faculty of section.faculty) {
+						string += `**Instructor:** ${faculty.displayName}
+						📧 ${faculty.emailAddress}`
+
+					}
+
+					string += `\n**– Meeting Times –**`
+					
+					for(var meeting of section.meetingsFaculty) {
+						string += `
+
+							**MEETING TIME ${meeting.category}**
+							${meeting.meetingTime.buildingDescription}
+							⏳ ${meeting.meetingTime.beginTime}
+							⌛ ${meeting.meetingTime.endTime}
+							🗓️ ${meetingDays(meeting.meetingTime)}
+						`
+					}
+					console.log(section.faculty);
+
+					embed.addFields({name: `Section ${section.sequenceNumber} (${section.courseReferenceNumber})`, value: string, inline: true});
+				}
+
+				await interaction.reply({embeds: [embed]});
+
+				client.cooldowns.set("Lookup", true);
+				setTimeout(() => {
+				client.cooldowns.delete("Lookup");
+				}, client.COOLDOWN_SECONDS * 1000);
+
+			} catch (error) {
+				console.error(error);
+				await interaction.reply("Could not find that course.");
 			}
 
-			await interaction.reply({embeds: [embed]});
-
-		} catch (error) {
-			console.error(error);
-			await interaction.reply("Could not find that course.");
 		}
 	},
 };

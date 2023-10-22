@@ -119,33 +119,45 @@ module.exports = {
 
 	
 
-	async execute(interaction) {
-		try {
-			
-			const course = {
-				term: "202436",
-				// term: interaction.options.getString('term'),
-				subjectCode: interaction.options.getString('subject').toUpperCase(),
-				courseNumber: interaction.options.getString('number')	
+	async execute(client, interaction) {
+
+		if (client.cooldowns.has("Course")) {
+			// cooldown not ended
+			interaction.reply({ content: "This command is on cooldown. Please wait a few seconds.", ephemeral: true });
+		} else {
+			try {
+				
+				const course = {
+					term: "202436",
+					// term: interaction.options.getString('term'),
+					subjectCode: interaction.options.getString('subject').toUpperCase(),
+					courseNumber: interaction.options.getString('number')	
+				}
+
+				// if(terms.filter(term => term.code == course.term).length == 0) { 
+				// 	await interaction.reply('Invalid Term.');
+				// }
+				var termFullName = terms.filter(term => term.code == course.term)[0].description;
+
+				const embed = new EmbedBuilder()
+					.setColor("#9E1B34")
+					.setAuthor({ name: `Information on ${termFullName} ${course.subjectCode} ${course.courseNumber}`, iconURL: 'https://teamcolorcodes.com/wp-content/uploads/2018/05/Temple-Owls-Logo-PNG.png', url: 'https://prd-xereg.temple.edu/StudentRegistrationSsb/ssb/classSearch/classSearch' })
+
+
+				await makeRequest(endpoints.getDescription, course, embed)
+				await makeRequest(endpoints.getDetails, course, embed)
+
+				client.cooldowns.set("Course", true);
+				setTimeout(() => {
+				client.cooldowns.delete("Course");
+				}, client.COOLDOWN_SECONDS * 1000);
+
+				await interaction.reply({embeds: [embed]});
+				
+			} catch (error) {
+				console.error(error);
+				await interaction.reply("Could not find that course.");
 			}
-
-			// if(terms.filter(term => term.code == course.term).length == 0) { 
-			// 	await interaction.reply('Invalid Term.');
-			// }
-			var termFullName = terms.filter(term => term.code == course.term)[0].description;
-
-			const embed = new EmbedBuilder()
-				.setColor("#9E1B34")
-				.setAuthor({ name: `Information on ${termFullName} ${course.subjectCode} ${course.courseNumber}`, iconURL: 'https://teamcolorcodes.com/wp-content/uploads/2018/05/Temple-Owls-Logo-PNG.png', url: 'https://prd-xereg.temple.edu/StudentRegistrationSsb/ssb/classSearch/classSearch' })
-
-
-			await makeRequest(endpoints.getDescription, course, embed)
-			await makeRequest(endpoints.getDetails, course, embed)
-
-			await interaction.reply({embeds: [embed]});
-		} catch (error) {
-			console.error(error);
-			await interaction.reply("Could not find that course.");
 		}
 	},
 };
